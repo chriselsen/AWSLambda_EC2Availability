@@ -1,6 +1,8 @@
 # AWSLambda_EC2Availability [![Build Status](https://travis-ci.org/chriselsen/AWSLambda_EC2Availability.svg?branch=master)](https://travis-ci.org/chriselsen/AWSLambda_EC2Availability)
 AWS Lambda Function to calculate availability of EC2 instances based on "StatusCheckFailed_System" metrics
 
+![Screenshot](https://github.com/chriselsen/AWSLambda_EC2Availability/raw/master/EC2Availability.PNG)
+
 **Pre-Requisites:**
 * Role for Lambda that allows put-metric access to Amazon CloudWatch and DescribeInstances for EC2
 
