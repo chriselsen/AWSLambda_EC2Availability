@@ -21,7 +21,7 @@ AWS Lambda Function to calculate availability of EC2 instances based on "StatusC
   * JSON: { "instanceType": "t2.micro", "daysAggregate": "30", "region": "us-west-2" }
  
 **Defaul Settings for JSON:**
-* instanceType: t2.micro
+* instanceType: All
 * daysAggregate: 30  <-- Calculate availability over last 30 days
 * region: us-west-2  <-- Oregon
  
