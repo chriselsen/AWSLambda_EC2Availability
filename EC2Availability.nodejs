@@ -1,0 +1,144 @@
+'use strict';
+var instanceNum = 0;
+var loopNum = 0;
+
+exports.handler = (event, context, callback) => {
+    var availabilityInstanceType = (event.instanceType === undefined ? 't2.micro' : event.instanceType);
+    var daysAggregate = parseInt((event.daysAggregate === undefined ? '30' : event.daysAggregate), 10);
+    var region = (event.region === undefined ? 'us-west-2' : event.region);
+    getAvailability(availabilityInstanceType, daysAggregate, region, function(err, availability){
+        if(!err) {
+            callback(null, availability);
+        } else {
+            callback(err);
+        }
+    });    
+};
+
+function getAvailability(instanceType, daysAggregate, region, callback){
+    var availabilitySum = 0;
+    var availabilityCount = 0;
+    instanceNum = 0;
+    loopNum = 0;
+    getInstances(instanceType, daysAggregate, region, function(err, availabilityArray){
+        loopNum++;
+        if(!err){
+            availabilitySum += availabilityArray[0];
+            availabilityCount += availabilityArray[1];
+            if (loopNum == instanceNum){
+                putCloudWatch(((1 - (availabilitySum / availabilityCount))*100), instanceType, daysAggregate, function(err, response){
+                    callback(null, response);
+                });
+            }
+        } else {
+            callback(err);
+        }
+    });
+}
+
+function getInstances(instanceType, daysAggregate, region, callback){
+    var AWS = require('aws-sdk');
+    AWS.config.region = region;
+    var ec2 = new AWS.EC2({apiVersion: '2016-11-15'});
+
+    var params = {
+        Filters: [{
+            Name: 'instance-type',
+            Values: [
+                instanceType,
+            ]
+        }]
+    };
+
+    ec2.describeInstances(params, function(err, data) {
+        var instanceIds = [];
+        if (err) {
+            console.log("Error", err.stack);
+            callback("Getting EC2 instance data failed");
+        } else {
+            var util = require('util');
+            instanceNum = data.Reservations.length;
+	        for( var item in data.Reservations) {  	
+		        var instances = data.Reservations[item].Instances;
+		        for ( var instance in instances) {
+		            instanceIds.push(instances[instance].InstanceId);
+		        }
+	        }
+        }
+        if (instanceIds.length > 0) {
+            getStatusCheckFailed(instanceIds, daysAggregate, region, callback); 
+        } else {
+            callback("Selected EC2 instances not used");
+        }
+    });
+}
+
+function getStatusCheckFailed(instanceIds, daysAggregate, region, callback){ 
+    var endDate = new Date();
+    var dateLength = ( 60 * 60 * 24 * daysAggregate );
+    var startDate = new Date(endDate - 1000 * dateLength);
+
+    instanceIds.forEach(function(instanceId) {
+        var paramsSum = {
+    		StartTime: startDate,
+            EndTime: endDate,
+            MetricName: 'StatusCheckFailed_System',
+            Namespace: 'AWS/EC2',
+            Period: dateLength,
+            Dimensions: [{
+                Name: 'InstanceId',
+                Value: instanceId
+                }],
+                Statistics: [
+                    'Sum', 'SampleCount',
+                ],
+            };
+                        
+        var AWS = require('aws-sdk');
+        AWS.config.region = region;
+        var cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+        cloudwatch.getMetricStatistics(paramsSum, function(err, data) {
+            if (err) {
+                console.log("Error", err.stack);
+                callback("Getting CloudWatch data failed");
+            } else {
+                var availability = [ data.Datapoints[0].Sum, data.Datapoints[0].SampleCount ];
+                callback(null, availability);
+            }
+        });
+    });    
+}
+
+function putCloudWatch(availability, instanceType, daysAggregate, callback){
+    var AWS = require('aws-sdk');
+    AWS.config.region = 'us-west-2';
+    var cloudwatch = new AWS.CloudWatch({apiVersion: '2010-08-01'});
+    
+    var params = {
+            MetricData: [
+                {
+                    MetricName: 'Last ' + daysAggregate + ' Days', /* required */
+                    Dimensions: [
+                        {
+                            Name: 'Instance Type', /* required */
+                            Value: instanceType /* required */
+                        },
+                    ],
+                    Timestamp: + Math.floor(new Date() / 1000),
+                    Unit: 'Percent',
+                    Value: + availability.toFixed(3) 
+                }
+            ],
+            Namespace: 'EC2Availability' /* required */
+        };
+        
+        cloudwatch.putMetricData(params, function(err, data) {
+            if (err) { 
+                console.log(err, err.stack);
+                callback("Saving Availability Data failed");
+            } else {
+                console.log(data);
+                callback(null, "Availability Data saved successfully");
+            }
+        });
+}
