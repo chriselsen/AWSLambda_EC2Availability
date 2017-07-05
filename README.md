@@ -1,5 +1,5 @@
 # AWSLambda_EC2Availability [![Build Status](https://travis-ci.org/chriselsen/AWSLambda_EC2Availability.svg?branch=master)](https://travis-ci.org/chriselsen/AWSLambda_EC2Availability)
-AWS Lambda Function to calculate availability of EC2 instances based on [System Status Checks (StatusCheckFailed_System)](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-system-instance-status-check.html#types-of-instance-status-checks) metrics
+AWS Lambda Function to calculate availability of EC2 instances based on [System Status Checks (StatusCheckFailed_System)](http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-system-instance-status-check.html#types-of-instance-status-checks) metrics.
 
 ![Screenshot](https://github.com/chriselsen/AWSLambda_EC2Availability/raw/master/EC2Availability.PNG)
 
