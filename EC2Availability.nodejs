@@ -3,7 +3,7 @@ var instanceNum = 0;
 var loopNum = 0;
 
 exports.handler = (event, context, callback) => {
-    var availabilityInstanceType = (event.instanceType === undefined ? 't2.micro' : event.instanceType);
+    var availabilityInstanceType = (event.instanceType === undefined ? 'All' : event.instanceType);
     var daysAggregate = parseInt((event.daysAggregate === undefined ? '30' : event.daysAggregate), 10);
     var region = (event.region === undefined ? 'us-west-2' : event.region);
     getAvailability(availabilityInstanceType, daysAggregate, region, function(err, availability){
@@ -26,6 +26,7 @@ function getAvailability(instanceType, daysAggregate, region, callback){
             availabilitySum += availabilityArray[0];
             availabilityCount += availabilityArray[1];
             if (loopNum == instanceNum){
+                console.log("Sum of outage data points: " + availabilitySum + " / Sum of total data points: " + availabilityCount);
                 putCloudWatch(((1 - (availabilitySum / availabilityCount))*100), instanceType, daysAggregate, function(err, response){
                     callback(null, response);
                 });
@@ -40,15 +41,20 @@ function getInstances(instanceType, daysAggregate, region, callback){
     var AWS = require('aws-sdk');
     AWS.config.region = region;
     var ec2 = new AWS.EC2({apiVersion: '2016-11-15'});
+    var params;
 
-    var params = {
-        Filters: [{
-            Name: 'instance-type',
-            Values: [
-                instanceType,
-            ]
-        }]
-    };
+    if(instanceType != 'All') {
+        params = {
+            Filters: [{
+                Name: 'instance-type',
+                Values: [
+                    instanceType,
+                ]
+            }]
+        };
+    } else {
+        params = {};
+    }
 
     ec2.describeInstances(params, function(err, data) {
         var instanceIds = [];
@@ -58,6 +64,7 @@ function getInstances(instanceType, daysAggregate, region, callback){
         } else {
             var util = require('util');
             instanceNum = data.Reservations.length;
+            console.log("Found " + instanceNum + " instances of type " + instanceType);
 	        for( var item in data.Reservations) {  	
 		        var instances = data.Reservations[item].Instances;
 		        for ( var instance in instances) {
@@ -66,6 +73,7 @@ function getInstances(instanceType, daysAggregate, region, callback){
 	        }
         }
         if (instanceIds.length > 0) {
+            console.log("Instances: " + JSON.stringify(instanceIds));
             getStatusCheckFailed(instanceIds, daysAggregate, region, callback); 
         } else {
             callback("Selected EC2 instances not used");
